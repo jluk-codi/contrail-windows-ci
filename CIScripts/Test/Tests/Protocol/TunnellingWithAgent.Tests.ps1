@@ -371,6 +371,7 @@ Describe "Tunnelling with Agent tests" {
     Context "IP fragmentation" {
         # TODO: Enable this test once fragmentation is properly implemented in vRouter
         It "ICMP - Ping with big buffer succeeds" -Pending {
+            # Two tests for packets larger than MTU before adding tunnelling headers
             Test-Ping `
                 -Session $Sessions[0] `
                 -SrcContainerName $Container1ID `
@@ -384,14 +385,43 @@ Describe "Tunnelling with Agent tests" {
                 -DstContainerName $Container1ID `
                 -DstContainerIP $Container1NetInfo.IPAddress `
                 -BufferSize 1473 | Should Be 0
+
+            # Two tests for packets larger than MTU after adding tunnelling headers
+            Test-Ping `
+                -Session $Sessions[0] `
+                -SrcContainerName $Container1ID `
+                -DstContainerName $Container2ID `
+                -DstContainerIP $Container2NetInfo.IPAddress `
+                -BufferSize 1471 | Should Be 0
+
+            Test-Ping `
+                -Session $Sessions[1] `
+                -SrcContainerName $Container2ID `
+                -DstContainerName $Container1ID `
+                -DstContainerIP $Container1NetInfo.IPAddress `
+                -BufferSize 1471 | Should Be 0
         }
 
         # TODO: Enable this test once fragmentation is properly implemented in vRouter
         It "UDP - sending big buffer succeeds" -Pending {
-            $MyMessage = "buffer" * 300
             $UDPServerPort = 1111
             $UDPClientPort = 2222
 
+            # Test for packet larger than MTU before adding tunnelling headers
+            $MyMessage = "buffer" * 300
+            Test-UDP `
+                -Session1 $Sessions[0] `
+                -Session2 $Sessions[1] `
+                -Container1Name $Container1ID `
+                -Container2Name $Container2ID `
+                -Container1IP $Container1NetInfo.IPAddress `
+                -Container2IP $Container2NetInfo.IPAddress `
+                -Message $MyMessage `
+                -UDPServerPort $UDPServerPort `
+                -UDPClientPort $UDPClientPort | Should Be $true
+
+            # Test for packet larger than MTU after adding tunnelling headers
+            $MyMessage = "a" * 1471
             Test-UDP `
                 -Session1 $Sessions[0] `
                 -Session2 $Sessions[1] `
@@ -522,7 +552,7 @@ Describe "Tunnelling with Agent tests" {
 
             Write-Log "Removing all containers"
             Remove-AllContainers -Sessions $Sessions
-    
+
             Clear-TestConfiguration -Session $Sessions[0] -SystemConfig $SystemConfig
             Clear-TestConfiguration -Session $Sessions[1] -SystemConfig $SystemConfig
         } finally {
