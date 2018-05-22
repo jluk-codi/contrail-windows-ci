@@ -66,10 +66,10 @@ function Get-RemoteContainerNetAdapterInformation {
 
         $RemoteCommand = {
             $GetIPAddress = { ($_ | Get-NetIPAddress -AddressFamily IPv4).IPAddress }
-            $Fields = 'ifIndex', 'ifName', 'Name', 'MacAddress', @{L='IPAddress'; E=$GetIPAddress}
+            $Fields = 'ifIndex', 'ifName', 'Name', 'MacAddress', 'MtuSize', @{L='IPAddress'; E=$GetIPAddress}
             $Adapter = (Get-NetAdapter -Name 'vEthernet (Container NIC *)')[0]
             $Adapter | Select-Object $Fields | ConvertTo-Json
-        }.toString()
+        }.ToString()
 
         docker exec $Using:ContainerID powershell $RemoteCommand
     } | ConvertFrom-Json
@@ -81,6 +81,7 @@ function Get-RemoteContainerNetAdapterInformation {
         AdapterShortName = [regex]::new('vEthernet \((.*)\)').Replace($Adapter.Name, '$1')
         MacAddressWindows = $Adapter.MacAddress.ToLower()
         IPAddress = $Adapter.IPAddress
+        MtuSize = $Adapter.MtuSize
     }
 
     $Ret.MacAddress = $Ret.MacAddressWindows.Replace('-', ':')

@@ -29,6 +29,37 @@ $Subnet = [SubnetConfiguration]::new(
     "10.0.5.83"
 )
 
+function Get-MaxIPv4DataSizeForMTU {
+    Param (
+        [Parameter(Mandatory=$true)] [Int] $MTU
+    )
+
+    # Minimal IP header size
+    $IPHeaderSize = 20
+
+    return $MTU - $IPHeaderSize
+}
+
+function Get-MaxICMPDataSizeForMTU {
+    Param (
+        [Parameter(Mandatory=$true)] [Int] $MTU
+    )
+
+    $ICMPHeaderSize = 8
+
+    return $(Get-MaxIPv4DataSizeForMTU -MTU $MTU) - $ICMPHeaderSize
+}
+
+function Get-MaxUDPDataSizeForMTU {
+    Param (
+        [Parameter(Mandatory=$true)] [Int] $MTU
+    )
+
+    $UDPHeaderSize = 8
+
+    return $(Get-MaxIPv4DataSizeForMTU -MTU $MTU) - $UDPHeaderSize
+}
+
 function Initialize-ComputeNode {
     Param (
         [Parameter(Mandatory=$true)] [PSSessionT] $Session,
@@ -371,20 +402,23 @@ Describe "Tunnelling with Agent tests" {
     Context "IP fragmentation" {
         # TODO: Enable this test once fragmentation is properly implemented in vRouter
         It "ICMP - Ping with big buffer succeeds" -Pending {
+            $Container1MaxBufferSize = Get-MaxICMPDataSizeForMTU -MTU $Container1NetInfo.MtuSize
+            $Container2MaxBufferSize = Get-MaxICMPDataSizeForMTU -MTU $Container2NetInfo.MtuSize
+
             # Two tests for packets larger than MTU before adding tunnelling headers
             Test-Ping `
                 -Session $Sessions[0] `
                 -SrcContainerName $Container1ID `
                 -DstContainerName $Container2ID `
                 -DstContainerIP $Container2NetInfo.IPAddress `
-                -BufferSize 1473 | Should Be 0
+                -BufferSize $($Container1MaxBufferSize + 1) | Should Be 0
 
             Test-Ping `
                 -Session $Sessions[1] `
                 -SrcContainerName $Container2ID `
                 -DstContainerName $Container1ID `
                 -DstContainerIP $Container1NetInfo.IPAddress `
-                -BufferSize 1473 | Should Be 0
+                -BufferSize $($Container2MaxBufferSize + 1) | Should Be 0
 
             # Two tests for packets larger than MTU after adding tunnelling headers
             Test-Ping `
@@ -392,23 +426,24 @@ Describe "Tunnelling with Agent tests" {
                 -SrcContainerName $Container1ID `
                 -DstContainerName $Container2ID `
                 -DstContainerIP $Container2NetInfo.IPAddress `
-                -BufferSize 1471 | Should Be 0
+                -BufferSize $($Container1MaxBufferSize - 1) | Should Be 0
 
             Test-Ping `
                 -Session $Sessions[1] `
                 -SrcContainerName $Container2ID `
                 -DstContainerName $Container1ID `
                 -DstContainerIP $Container1NetInfo.IPAddress `
-                -BufferSize 1471 | Should Be 0
+                -BufferSize $($Container2MaxBufferSize - 1) | Should Be 0
         }
 
         # TODO: Enable this test once fragmentation is properly implemented in vRouter
         It "UDP - sending big buffer succeeds" -Pending {
+            $MaxBufferSize = Get-MaxUDPDataSizeForMTU -MTU $Container1NetInfo.MtuSize
             $UDPServerPort = 1111
             $UDPClientPort = 2222
 
             # Test for packet larger than MTU before adding tunnelling headers
-            $MyMessage = "buffer" * 300
+            $MyMessage = "buffer" * $MaxBufferSize
             Test-UDP `
                 -Session1 $Sessions[0] `
                 -Session2 $Sessions[1] `
@@ -421,7 +456,7 @@ Describe "Tunnelling with Agent tests" {
                 -UDPClientPort $UDPClientPort | Should Be $true
 
             # Test for packet larger than MTU after adding tunnelling headers
-            $MyMessage = "a" * 1471
+            $MyMessage = "a" * $($MaxBufferSize - 1)
             Test-UDP `
                 -Session1 $Sessions[0] `
                 -Session2 $Sessions[1] `
