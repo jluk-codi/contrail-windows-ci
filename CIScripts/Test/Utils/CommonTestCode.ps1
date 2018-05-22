@@ -14,6 +14,7 @@ class ContainerNetAdapterInformation : NetAdapterInformation {
     [string] $AdapterShortName;
     [string] $AdapterFullName;
     [string] $IPAddress;
+    [int] $MtuSize;
 }
 
 class VMNetAdapterInformation : NetAdapterMacAddresses {
