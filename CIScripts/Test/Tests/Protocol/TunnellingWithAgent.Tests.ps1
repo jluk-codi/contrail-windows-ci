@@ -30,33 +30,20 @@ $Subnet = [SubnetConfiguration]::new(
 )
 
 function Get-MaxIPv4DataSizeForMTU {
-    Param (
-        [Parameter(Mandatory=$true)] [Int] $MTU
-    )
-
-    # Minimal IP header size
-    $IPHeaderSize = 20
-
-    return $MTU - $IPHeaderSize
+    Param ([Parameter(Mandatory=$true)] [Int] $MTU)
+    $MinimalIPHeaderSize = 20
+    return $MTU - $MinimalIPHeaderSize
 }
 
 function Get-MaxICMPDataSizeForMTU {
-    Param (
-        [Parameter(Mandatory=$true)] [Int] $MTU
-    )
-
+    Param ([Parameter(Mandatory=$true)] [Int] $MTU)
     $ICMPHeaderSize = 8
-
     return $(Get-MaxIPv4DataSizeForMTU -MTU $MTU) - $ICMPHeaderSize
 }
 
 function Get-MaxUDPDataSizeForMTU {
-    Param (
-        [Parameter(Mandatory=$true)] [Int] $MTU
-    )
-
+    Param ([Parameter(Mandatory=$true)] [Int] $MTU)
     $UDPHeaderSize = 8
-
     return $(Get-MaxIPv4DataSizeForMTU -MTU $MTU) - $UDPHeaderSize
 }
 
@@ -405,35 +392,23 @@ Describe "Tunnelling with Agent tests" {
             $Container1MaxBufferSize = Get-MaxICMPDataSizeForMTU -MTU $Container1NetInfo.MtuSize
             $Container2MaxBufferSize = Get-MaxICMPDataSizeForMTU -MTU $Container2NetInfo.MtuSize
 
-            # Two tests for packets larger than MTU before adding tunnelling headers
-            Test-Ping `
-                -Session $Sessions[0] `
-                -SrcContainerName $Container1ID `
-                -DstContainerName $Container2ID `
-                -DstContainerIP $Container2NetInfo.IPAddress `
-                -BufferSize $($Container1MaxBufferSize + 1) | Should Be 0
+            $SrcContainers = @($Container1ID, $Container2ID)
+            $DstContainers = @($Container2ID, $Container1ID)
+            $DstIPs = @($Container2NetInfo.IPAddress, $Container1NetInfo.IPAddress)
+            $BufferSizes = @($Container1MaxBufferSize, $Container2MaxBufferSize)
 
-            Test-Ping `
-                -Session $Sessions[1] `
-                -SrcContainerName $Container2ID `
-                -DstContainerName $Container1ID `
-                -DstContainerIP $Container1NetInfo.IPAddress `
-                -BufferSize $($Container2MaxBufferSize + 1) | Should Be 0
-
-            # Two tests for packets larger than MTU after adding tunnelling headers
-            Test-Ping `
-                -Session $Sessions[0] `
-                -SrcContainerName $Container1ID `
-                -DstContainerName $Container2ID `
-                -DstContainerIP $Container2NetInfo.IPAddress `
-                -BufferSize $($Container1MaxBufferSize - 1) | Should Be 0
-
-            Test-Ping `
-                -Session $Sessions[1] `
-                -SrcContainerName $Container2ID `
-                -DstContainerName $Container1ID `
-                -DstContainerIP $Container1NetInfo.IPAddress `
-                -BufferSize $($Container2MaxBufferSize - 1) | Should Be 0
+            foreach ($ContainerIdx in @(0, 1)) {
+                $BufferSizeLargerBefore = $BufferSizes[$ContainerIdx] + 1
+                $BufferSizeLargerAfter = $BufferSizes[$ContainerIdx] - 1
+                foreach ($BufferSize in @($BufferSizeLargerBefore, $BufferSizeLargerAfter)) {
+                    Test-Ping `
+                        -Session $Sessions[$ContainerIdx] `
+                        -SrcContainerName $SrcContainers[$ContainerIdx] `
+                        -DstContainerName $DstContainers[$ContainerIdx] `
+                        -DstContainerIP $DstIPs[$ContainerIdx] `
+                        -BufferSize $BufferSize | Should Be 0
+                }
+            }
         }
 
         # TODO: Enable this test once fragmentation is properly implemented in vRouter
@@ -442,31 +417,20 @@ Describe "Tunnelling with Agent tests" {
             $UDPServerPort = 1111
             $UDPClientPort = 2222
 
-            # Test for packet larger than MTU before adding tunnelling headers
-            $MyMessage = "buffer" * $MaxBufferSize
-            Test-UDP `
-                -Session1 $Sessions[0] `
-                -Session2 $Sessions[1] `
-                -Container1Name $Container1ID `
-                -Container2Name $Container2ID `
-                -Container1IP $Container1NetInfo.IPAddress `
-                -Container2IP $Container2NetInfo.IPAddress `
-                -Message $MyMessage `
-                -UDPServerPort $UDPServerPort `
-                -UDPClientPort $UDPClientPort | Should Be $true
-
-            # Test for packet larger than MTU after adding tunnelling headers
-            $MyMessage = "a" * $($MaxBufferSize - 1)
-            Test-UDP `
-                -Session1 $Sessions[0] `
-                -Session2 $Sessions[1] `
-                -Container1Name $Container1ID `
-                -Container2Name $Container2ID `
-                -Container1IP $Container1NetInfo.IPAddress `
-                -Container2IP $Container2NetInfo.IPAddress `
-                -Message $MyMessage `
-                -UDPServerPort $UDPServerPort `
-                -UDPClientPort $UDPClientPort | Should Be $true
+            $MessageLargerBefore = "buffer" * $MaxBufferSize
+            $MessageLargerAfter = "a" * $($MaxBufferSize - 1)
+            foreach ($Message in @($MessageLargerBefore, $MessageLargerAfter)) {
+                Test-UDP `
+                    -Session1 $Sessions[0] `
+                    -Session2 $Sessions[1] `
+                    -Container1Name $Container1ID `
+                    -Container2Name $Container2ID `
+                    -Container1IP $Container1NetInfo.IPAddress `
+                    -Container2IP $Container2NetInfo.IPAddress `
+                    -Message $Message `
+                    -UDPServerPort $UDPServerPort `
+                    -UDPClientPort $UDPClientPort | Should Be $true
+            }
         }
     }
 
