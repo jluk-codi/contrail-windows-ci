@@ -385,18 +385,18 @@ Describe "Tunnelling with Agent tests" {
     Context "IP fragmentation" {
         # TODO: Enable this test once fragmentation is properly implemented in vRouter
         It "ICMP - Ping with big buffer succeeds" -Pending {
-            $Container1MaxBufferSize = Get-MaxICMPDataSizeForMTU -MTU $Container1NetInfo.MtuSize
-            $Container2MaxBufferSize = Get-MaxICMPDataSizeForMTU -MTU $Container2NetInfo.MtuSize
+            $Container1MsgFragmentationThreshold = Get-MaxICMPDataSizeForMTU -MTU $Container1NetInfo.MtuSize
+            $Container2MsgFragmentationThreshold = Get-MaxICMPDataSizeForMTU -MTU $Container2NetInfo.MtuSize
 
             $SrcContainers = @($Container1ID, $Container2ID)
             $DstContainers = @($Container2ID, $Container1ID)
             $DstIPs = @($Container2NetInfo.IPAddress, $Container1NetInfo.IPAddress)
-            $BufferSizes = @($Container1MaxBufferSize, $Container2MaxBufferSize)
+            $BufferSizes = @($Container1MsgFragmentationThreshold, $Container2MsgFragmentationThreshold)
 
             foreach ($ContainerIdx in @(0, 1)) {
-                $BufferSizeLargerBefore = $BufferSizes[$ContainerIdx] + 1
-                $BufferSizeLargerAfter = $BufferSizes[$ContainerIdx] - 1
-                foreach ($BufferSize in @($BufferSizeLargerBefore, $BufferSizeLargerAfter)) {
+                $BufferSizeLargerBeforeTunnelling = $BufferSizes[$ContainerIdx] + 1
+                $BufferSizeLargerAfterTunnelling = $BufferSizes[$ContainerIdx] - 1
+                foreach ($BufferSize in @($BufferSizeLargerBeforeTunnelling, $BufferSizeLargerAfterTunnelling)) {
                     Test-Ping `
                         -Session $Sessions[$ContainerIdx] `
                         -SrcContainerName $SrcContainers[$ContainerIdx] `
@@ -409,11 +409,11 @@ Describe "Tunnelling with Agent tests" {
 
         # TODO: Enable this test once fragmentation is properly implemented in vRouter
         It "UDP - sending big buffer succeeds" -Pending {
-            $MaxBufferSize = Get-MaxUDPDataSizeForMTU -MTU $Container1NetInfo.MtuSize
+            $MsgFragmentationThreshold = Get-MaxUDPDataSizeForMTU -MTU $Container1NetInfo.MtuSize
 
-            $MessageLargerBefore = "a" * $($MaxBufferSize + 1)
-            $MessageLargerAfter = "a" * $($MaxBufferSize - 1)
-            foreach ($Message in @($MessageLargerBefore, $MessageLargerAfter)) {
+            $MessageLargerBeforeTunnelling = "a" * $($MsgFragmentationThreshold + 1)
+            $MessageLargerAfterTunnelling = "a" * $($MsgFragmentationThreshold - 1)
+            foreach ($Message in @($MessageLargerBeforeTunnelling, $MessageLargerAfterTunnelling)) {
                 Test-UDP `
                     -Session1 $Sessions[0] `
                     -Session2 $Sessions[1] `
