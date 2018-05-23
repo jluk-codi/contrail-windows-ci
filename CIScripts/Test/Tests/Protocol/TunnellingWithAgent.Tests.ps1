@@ -272,8 +272,8 @@ function Test-UDP {
         [Parameter(Mandatory=$true)] [String] $Container1IP,
         [Parameter(Mandatory=$true)] [String] $Container2IP,
         [Parameter(Mandatory=$true)] [String] $Message,
-        [Parameter(Mandatory=$true)] [Int16] $UDPServerPort,
-        [Parameter(Mandatory=$true)] [Int16] $UDPClientPort
+        [Parameter(Mandatory=$false)] [Int16] $UDPServerPort = 1111,
+        [Parameter(Mandatory=$false)] [Int16] $UDPClientPort = 2222
     )
 
     Write-Log "Starting UDP Echo server on container $Container1Name ..."
@@ -346,8 +346,6 @@ Describe "Tunnelling with Agent tests" {
 
         It "UDP" {
             $MyMessage = "We are Tungsten Fabric. We come in peace."
-            $UDPServerPort = 1905
-            $UDPClientPort = 1983
 
             Test-UDP `
                 -Session1 $Sessions[0] `
@@ -356,9 +354,7 @@ Describe "Tunnelling with Agent tests" {
                 -Container2Name $Container2ID `
                 -Container1IP $Container1NetInfo.IPAddress `
                 -Container2IP $Container2NetInfo.IPAddress `
-                -Message $MyMessage `
-                -UDPServerPort $UDPServerPort `
-                -UDPClientPort $UDPClientPort | Should Be $true
+                -Message $MyMessage | Should Be $true
 
             # TODO: Uncomment these checks once we can actually control tunneling type.
             # Test-MPLSoGRE -Session $Sessions[0] | Should Be $true
@@ -414,10 +410,8 @@ Describe "Tunnelling with Agent tests" {
         # TODO: Enable this test once fragmentation is properly implemented in vRouter
         It "UDP - sending big buffer succeeds" -Pending {
             $MaxBufferSize = Get-MaxUDPDataSizeForMTU -MTU $Container1NetInfo.MtuSize
-            $UDPServerPort = 1111
-            $UDPClientPort = 2222
 
-            $MessageLargerBefore = "buffer" * $MaxBufferSize
+            $MessageLargerBefore = "a" * $($MaxBufferSize + 1)
             $MessageLargerAfter = "a" * $($MaxBufferSize - 1)
             foreach ($Message in @($MessageLargerBefore, $MessageLargerAfter)) {
                 Test-UDP `
@@ -427,9 +421,7 @@ Describe "Tunnelling with Agent tests" {
                     -Container2Name $Container2ID `
                     -Container1IP $Container1NetInfo.IPAddress `
                     -Container2IP $Container2NetInfo.IPAddress `
-                    -Message $Message `
-                    -UDPServerPort $UDPServerPort `
-                    -UDPClientPort $UDPClientPort | Should Be $true
+                    -Message $Message | Should Be $true
             }
         }
     }
