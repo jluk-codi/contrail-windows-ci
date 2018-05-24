@@ -31,7 +31,7 @@ $Subnet = [SubnetConfiguration]::new(
 
 function Get-MaxIPv4DataSizeForMTU {
     Param ([Parameter(Mandatory=$true)] [Int] $MTU)
-    $MinimalIPHeaderSize = 20
+    $MinimalIPHeaderSize = 400
     return $MTU - $MinimalIPHeaderSize
 }
 
@@ -384,7 +384,7 @@ Describe "Tunnelling with Agent tests" {
 
     Context "IP fragmentation" {
         # TODO: Enable this test once fragmentation is properly implemented in vRouter
-        It "ICMP - Ping with big buffer succeeds" -Pending {
+        It "ICMP - Ping with big buffer succeeds" {
             $Container1MsgFragmentationThreshold = Get-MaxICMPDataSizeForMTU -MTU $Container1NetInfo.MtuSize
             $Container2MsgFragmentationThreshold = Get-MaxICMPDataSizeForMTU -MTU $Container2NetInfo.MtuSize
 
@@ -397,6 +397,7 @@ Describe "Tunnelling with Agent tests" {
                 $BufferSizeLargerBeforeTunnelling = $BufferSizes[$ContainerIdx] + 1
                 $BufferSizeLargerAfterTunnelling = $BufferSizes[$ContainerIdx] - 1
                 foreach ($BufferSize in @($BufferSizeLargerBeforeTunnelling, $BufferSizeLargerAfterTunnelling)) {
+                    Write-Host "********** Ping buffer size: $BufferSize"
                     Test-Ping `
                         -Session $Sessions[$ContainerIdx] `
                         -SrcContainerName $SrcContainers[$ContainerIdx] `
@@ -408,7 +409,7 @@ Describe "Tunnelling with Agent tests" {
         }
 
         # TODO: Enable this test once fragmentation is properly implemented in vRouter
-        It "UDP - sending big buffer succeeds" -Pending {
+        It "UDP - sending big buffer succeeds" {
             $MsgFragmentationThreshold = Get-MaxUDPDataSizeForMTU -MTU $Container1NetInfo.MtuSize
 
             $MessageLargerBeforeTunnelling = "a" * $($MsgFragmentationThreshold + 1)
