@@ -1,0 +1,105 @@
+---
+
+- name: Check if identity file exists
+  register: identity_exists
+  stat:
+    path: "{{ identity_file }}"
+
+- name: Load private keys from zuul group_vars vault
+  when: identity_exists.stat.exists == False
+  include_vars:
+    file: group_vars/zuul/vault
+    name: zuul_vault
+
+- name: Crate identity file (if not present)
+  when: identity_exists.stat.exists == False
+  copy:
+    content: "{{ zuul_vault.gerrit_keys[gerrit_keyname] }}"
+    mode: 0600
+    dest: "{{ identity_file }}"
+
+- name: Load public keys from zuul group_vars
+  include_vars:
+    file: group_vars/zuul/vars
+    name: zuul_vars
+
+- name: add gerrit servers to known hosts
+  known_hosts:
+    name: '{{ zuul_vars.gerrit_known_hosts[item].name }}'
+    key: '{{ zuul_vars.gerrit_known_hosts[item].key }}'
+  with_items:
+    - review
+    - review2
+
+- name: Store Verified-1 regex pattern
+  set_fact:
+    failure_pattern: '^Patch Set {{ patchset }}: Verified-1'
+
+- name: Wait for Verified-1 comment from {{ ci_user }}
+  register: comments
+  command: >
+    ssh
+    -i {{ identity_file | quote }}
+    -p {{ gerrit_port }}
+    {{ gerrit_user }}@{{ gerrit_server }}
+    'gerrit query "change:{{ change_id }}" --comments --format JSON'
+  retries: 6
+  delay: 10
+  until: >
+    comments.rc == 0 and
+    (comments.stdout_lines[0] | from_json).comments
+    | selectattr('reviewer.username', 'equalto', ci_user)
+    | map(attribute='message')
+    | list
+    | last
+    | regex_search(failure_pattern)
+  tags:
+    # This would fire [ANSIBLE0012] Commands should not change things if nothing needs doing,
+    # but it's ok as this command is side-effect free.
+    - skip_ansible_lint
+
+- name: Count failures
+  set_fact:
+    n_failures: >
+      {{
+      (comments.stdout_lines[0] | from_json).comments
+      | selectattr('reviewer.username', 'equalto', ci_user)
+      | map(attribute='message')
+      | map('regex_search', failure_pattern)
+      | select
+      | list
+      | count
+      }}
+
+- name: Show failure count
+  debug:
+    var: n_failures
+
+- name: Prepare the recheck message
+  when: n_failures | int < max_rechecks | int + 1
+  set_fact:
+    comment_message: >
+      We've detected that Windows CI failed due to flakiness, so we're going to recheck windows
+
+- name: Prepare the recheck limit exceeded message
+  when: n_failures | int >= max_rechecks | int + 1
+  set_fact:
+    comment_message: >
+      Automatic recheck limit ({{ max_rechecks }}) exceeded.
+
+- name: Show the message
+  debug:
+    var: comment_message
+
+- name: Post the comment
+  command: >
+    ssh
+    -i {{ identity_file | quote }}
+    -p {{ gerrit_port }}
+    {{ gerrit_user }}@{{ gerrit_server }}
+    gerrit review -m {{ comment_message | quote | quote }} {{ change_id }},{{ patchset }}
+  tags:
+    - action
+    # This would fire [ANSIBLE0012] Commands should not change things if nothing needs doing,
+    # but it's ok as the purpose of this role is to post a comment.
+    - skip_ansible_lint
