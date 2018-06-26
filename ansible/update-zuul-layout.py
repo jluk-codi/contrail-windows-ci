@@ -24,13 +24,13 @@ actually_used_projects = [
     "Juniper/contrail-vrouter",
     "Juniper/contrail-build",
     "Juniper/contrail-third-party",
-    "Juniper/contrail-sandesh",
     "Juniper/contrail-common",
+    "Juniper/contrail-windows-docker-driver",
 ]
 
 projects = []
 lines_to_preserve = []
-relevant_project_name_re = re.compile("Juniper/.*")
+relevant_project_name_re = re.compile("(Juniper|tungstenfabric)/.*")
 
 print("> Reading original layout file...")
 
@@ -66,7 +66,7 @@ with open(layout_file, "w", newline="\n") as new_layout_file:
     for line in lines_to_preserve:
         print(line, file=new_layout_file)
 
-    for project_name, _ in projects.items():
+    for project_name, _ in sorted(projects.items()):
         if not project_name in actually_used_projects \
                 and relevant_project_name_re.match(project_name):
             print(template.format(project_name), file=new_layout_file)

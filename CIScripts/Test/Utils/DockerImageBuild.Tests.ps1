@@ -1,6 +1,6 @@
 Param (
     [Parameter(Mandatory=$false)] [string] $TestenvConfFile,
-    [Parameter(Mandatory=$false)] [string] $LogDir = "pesterLogs"
+    [Parameter(ValueFromRemainingArguments=$true)] $UnusedParams
 )
 
 . $PSScriptRoot\DockerImageBuild.ps1
@@ -19,7 +19,7 @@ Describe "Initialize-DockerImage" -Tags CI, Systest {
             "PSUseDeclaredVarsMoreThanAssignments", "",
             Justification="Analyzer doesn't understand relation of Pester blocks"
         )]
-        $DockerImageName = "iis-tcptest"
+        $DockerImageName = "python-http"
     }
 
     AfterAll {
@@ -27,7 +27,7 @@ Describe "Initialize-DockerImage" -Tags CI, Systest {
         Remove-PSSession $Sessions
     }
 
-    It "Builds iis-tcptest image" {
+    It "Builds python-http image" {
         $DockerOutput = Initialize-DockerImage -Session $Session -DockerImageName $DockerImageName
         $DockerOutput | Should -Contain "Successfully tagged $( $DockerImageName ):latest"
         $DockerOutput -Join "" | Should -BeLike "*Successfully built*"

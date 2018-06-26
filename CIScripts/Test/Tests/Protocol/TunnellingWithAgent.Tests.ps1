@@ -1,6 +1,7 @@
 Param (
     [Parameter(Mandatory=$false)] [string] $TestenvConfFile,
-    [Parameter(Mandatory=$false)] [string] $LogDir = "pesterLogs"
+    [Parameter(Mandatory=$false)] [string] $LogDir = "pesterLogs",
+    [Parameter(ValueFromRemainingArguments=$true)] $UnusedParams
 )
 
 . $PSScriptRoot\..\..\..\Common\Aliases.ps1
@@ -17,7 +18,7 @@ Param (
 . $PSScriptRoot\..\..\PesterLogger\PesterLogger.ps1
 . $PSScriptRoot\..\..\PesterLogger\RemoteLogCollector.ps1
 
-$IisTcpTestDockerImage = "iis-tcptest"
+$TCPServerDockerImage = "python-http"
 $Container1ID = "jolly-lumberjack"
 $Container2ID = "juniper-tree"
 $NetworkName = "testnet12"
@@ -507,7 +508,7 @@ Describe "Tunnelling with Agent tests" {
             -Session $Sessions[0] `
             -NetworkName $NetworkName `
             -Name $Container1ID `
-            -Image $IisTcpTestDockerImage
+            -Image $TCPServerDockerImage
         Write-Log "Creating container: $Container2ID"
         New-Container `
             -Session $Sessions[1] `
@@ -532,8 +533,8 @@ Describe "Tunnelling with Agent tests" {
         )]
         $Container2NetInfo = Get-RemoteContainerNetAdapterInformation `
             -Session $Sessions[1] -ContainerID $Container2ID
-            $IP = $Container2NetInfo.IPAddress
-            Write-Log "IP of ${Container2ID}: $IP"
+        $IP = $Container2NetInfo.IPAddress
+        Write-Log "IP of ${Container2ID}: $IP"
     }
 
     AfterEach {
