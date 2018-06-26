@@ -1,6 +1,7 @@
 Param (
     [Parameter(Mandatory=$false)] [string] $TestenvConfFile,
-    [Parameter(Mandatory=$false)] [string] $LogDir = "pesterLogs"
+    [Parameter(Mandatory=$false)] [string] $LogDir = "pesterLogs",
+    [Parameter(ValueFromRemainingArguments=$true)] $UnusedParams
 )
 
 . $PSScriptRoot\..\..\..\Common\Aliases.ps1
@@ -17,7 +18,7 @@ Param (
 . $PSScriptRoot\..\..\PesterLogger\PesterLogger.ps1
 . $PSScriptRoot\..\..\PesterLogger\RemoteLogCollector.ps1
 
-$IisTcpTestDockerImage = "iis-tcptest"
+$TCPServerDockerImage = "python-http"
 $Container1ID = "jolly-lumberjack"
 $Container2ID = "juniper-tree"
 $NetworkName = "testnet12"
@@ -163,8 +164,11 @@ function Start-UDPEchoServerInContainer {
     '$SendPort = {0};' + `
     '$RcvPort = {1};' + `
     '$IPEndpoint = New-Object System.Net.IPEndPoint([IPAddress]::Any, $RcvPort);' + `
-    '$UDPSocket = New-Object System.Net.Sockets.UdpClient($IPEndpoint);' + `
     '$RemoteIPEndpoint = New-Object System.Net.IPEndPoint([IPAddress]::Any, 0);' + `
+    '$UDPSocket = New-Object System.Net.Sockets.UdpClient;' + `
+    '$UDPSocket.Client.SetSocketOption([System.Net.Sockets.SocketOptionLevel]::Socket, [System.Net.Sockets.SocketOptionName]::ReuseAddress, $true);' + `
+    '$UDPSocket.ExclusiveAddressUse = $false;' + `
+    '$UDPSocket.Client.Bind($IPEndpoint);' + `
     'while($true) {{' + `
     '    $Payload = $UDPSocket.Receive([ref]$RemoteIPEndpoint);' + `
     '    $RemoteIPEndpoint.Port = $SendPort;' + `
@@ -506,7 +510,7 @@ Describe "Tunnelling with Agent tests" {
             -Session $Sessions[0] `
             -NetworkName $NetworkName `
             -Name $Container1ID `
-            -Image $IisTcpTestDockerImage
+            -Image $TCPServerDockerImage
         Write-Log "Creating container: $Container2ID"
         New-Container `
             -Session $Sessions[1] `
@@ -531,8 +535,8 @@ Describe "Tunnelling with Agent tests" {
         )]
         $Container2NetInfo = Get-RemoteContainerNetAdapterInformation `
             -Session $Sessions[1] -ContainerID $Container2ID
-            $IP = $Container2NetInfo.IPAddress
-            Write-Log "IP of ${Container2ID}: $IP"
+        $IP = $Container2NetInfo.IPAddress
+        Write-Log "IP of ${Container2ID}: $IP"
     }
 
     AfterEach {
