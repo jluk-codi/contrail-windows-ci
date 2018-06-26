@@ -305,7 +305,17 @@ pipeline {
 
                     if (containsFlakiness("to_publish/$logFilename")) {
                         echo "Flakiness detected"
-                        echo "TODO: Spawn a post-recheck-comment job here"
+                        if (isGithub()) {
+                            sendGithubComment("recheck no bug")
+                        } else {
+                            build job: "post-recheck-comment",
+                                wait: false,
+                                parameters: [
+                                    string(name: 'BRANCH_NAME', value: env.BRANCH_NAME),
+                                    string(name: 'ZUUL_CHANGE', value: env.ZUUL_CHANGE),
+                                    string(name: 'ZUUL_PATCHSET', value: env.ZUUL_PATCHSET),
+                                ]
+                        }
                     }
                 }
             }
