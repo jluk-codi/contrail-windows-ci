@@ -163,8 +163,10 @@ function Start-UDPEchoServerInContainer {
     '$SendPort = {0};' + `
     '$RcvPort = {1};' + `
     '$IPEndpoint = New-Object System.Net.IPEndPoint([IPAddress]::Any, $RcvPort);' + `
-    '$UDPSocket = New-Object System.Net.Sockets.UdpClient($IPEndpoint);' + `
     '$RemoteIPEndpoint = New-Object System.Net.IPEndPoint([IPAddress]::Any, 0);' + `
+    '$UDPSocket = New-Object System.Net.Sockets.UdpClient;' + `
+    '$UDPSocket.Client.SetSocketOption([System.Net.Sockets.SocketOptionLevel]::Socket, [System.Net.Sockets.SocketOptionName]::ReuseAddress, $true);' + `
+    '$UDPSocket.Client.Bind($IPEndpoint);' + `
     'while($true) {{' + `
     '    $Payload = $UDPSocket.Receive([ref]$RemoteIPEndpoint);' + `
     '    $RemoteIPEndpoint.Port = $SendPort;' + `
