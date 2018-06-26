@@ -1,9 +1,6 @@
 Param([Parameter(Mandatory = $true)] [string] $RootDir,
       [Parameter(Mandatory = $true)] [string] $ConfigDir)
 
-Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
-
 $PSLinterConfig = "$ConfigDir/PSScriptAnalyzerSettings.psd1"
 Write-Host "Running PSScriptAnalyzer... (config from $PSLinterConfig)"
 

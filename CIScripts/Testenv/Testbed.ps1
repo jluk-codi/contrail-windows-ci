@@ -46,6 +46,4 @@ function New-RemoteSessions {
     return $Sessions
 }
 
-function Get-ComputeLogsDir { "C:/ProgramData/Contrail/var/log/contrail" }
-
-function Get-ComputeLogsPath { Join-Path (Get-ComputeLogsDir) "*.log" }
+function Get-ComputeLogsPath { "C:/ProgramData/Contrail/var/log/contrail/*.log" }

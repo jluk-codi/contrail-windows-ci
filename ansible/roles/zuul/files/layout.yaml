@@ -74,6 +74,8 @@ project-templates:
   - name: ci-contrail-windows-template
     check:
       - ci-contrail-windows-production
+    check-development:
+      - ci-contrail-windows-development
     check-windows-contrail-phase-in:
       - ci-contrail-windows-wc-phase-in
 
@@ -89,8 +91,6 @@ projects:
   - name: Juniper/contrail-controller
     template:
       - name: ci-contrail-windows-template
-    check-development:
-      - ci-contrail-windows-development
 
   - name: Juniper/contrail-vrouter
     template:
@@ -104,11 +104,11 @@ projects:
     template:
       - name: ci-contrail-windows-template
 
-  - name: Juniper/contrail-common
+  - name: Juniper/contrail-sandesh
     template:
       - name: ci-contrail-windows-template
 
-  - name: Juniper/contrail-windows-docker-driver
+  - name: Juniper/contrail-common
     template:
       - name: ci-contrail-windows-template
 
@@ -222,10 +222,6 @@ projects:
     template:
       - name: ci-contrail-windows-other-projects-template
 
-  - name: Juniper/contrail-sandesh
-    template:
-      - name: ci-contrail-windows-other-projects-template
-
   - name: Juniper/contrail-server-manager
     template:
       - name: ci-contrail-windows-other-projects-template
@@ -247,10 +243,6 @@ projects:
       - name: ci-contrail-windows-other-projects-template
 
   - name: Juniper/contrail-third-party-packages
-    template:
-      - name: ci-contrail-windows-other-projects-template
-
-  - name: Juniper/contrail-vcenter-manager
     template:
       - name: ci-contrail-windows-other-projects-template
 
@@ -290,10 +282,6 @@ projects:
     template:
       - name: ci-contrail-windows-other-projects-template
 
-  - name: Juniper/contrail-windows
-    template:
-      - name: ci-contrail-windows-other-projects-template
-
   - name: Juniper/contrail-zuul-jobs
     template:
       - name: ci-contrail-windows-other-projects-template
@@ -303,10 +291,6 @@ projects:
       - name: ci-contrail-windows-other-projects-template
 
   - name: Juniper/nova
-    template:
-      - name: ci-contrail-windows-other-projects-template
-
-  - name: Juniper/openshift-ansible
     template:
       - name: ci-contrail-windows-other-projects-template
 
@@ -323,9 +307,5 @@ projects:
       - name: ci-contrail-windows-other-projects-template
 
   - name: Juniper/vijava
-    template:
-      - name: ci-contrail-windows-other-projects-template
-
-  - name: tungstenfabric/contrail-ci-test
     template:
       - name: ci-contrail-windows-other-projects-template

@@ -1,4 +1,3 @@
-. $PSScriptRoot\Init.ps1
 . $PSScriptRoot/Invoke-CommandInLocation.ps1
 
 Describe "Invoke-CommandInLocation" -Tags CI, Unit {

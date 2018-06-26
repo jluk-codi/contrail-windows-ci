@@ -1,7 +1,6 @@
 Param (
     [Parameter(Mandatory=$false)] [string] $TestenvConfFile,
-    [Parameter(Mandatory=$false)] [string] $LogDir = "pesterLogs",
-    [Parameter(ValueFromRemainingArguments=$true)] $UnusedParams
+    [Parameter(Mandatory=$false)] [string] $LogDir = "pesterLogs"
 )
 
 . $PSScriptRoot\..\..\..\Common\Aliases.ps1
@@ -105,7 +104,7 @@ Describe "Single compute node protocol tests with utils" {
             -Subnet "$( $Subnet.IpPrefix )/$( $Subnet.IpPrefixLen )"
 
         Write-Log "Creating container 1"
-        New-Container -Session $Session -NetworkName $NetworkName -Name $Container1ID -Image python-http | Out-Null
+        New-Container -Session $Session -NetworkName $NetworkName -Name $Container1ID -Image iis-tcptest | Out-Null
 
         Write-Log "Creating container 2"
         New-Container -Session $Session -NetworkName $NetworkName -Name $Container2ID | Out-Null
@@ -171,7 +170,6 @@ Describe "Single compute node protocol tests with utils" {
             Justification="It's used in BeforeEach. Perhaps https://github.com/PowerShell/PSScriptAnalyzer/issues/804"
         )]
         $ContrailNM = [ContrailNetworkManager]::new($OpenStackConfig, $ControllerConfig)
-        $ContrailNM.EnsureProject($null)
     }
 
     AfterAll {

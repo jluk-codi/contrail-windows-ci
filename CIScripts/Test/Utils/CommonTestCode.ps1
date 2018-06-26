@@ -59,64 +59,35 @@ function Get-RemoteVMNetAdapterInformation {
     return [VMNetAdapterInformation] $NetAdapterInformation
 }
 
-function Read-RawRemoteContainerNetAdapterInformation {
-    Param (
-        [Parameter(Mandatory = $true)] [PSSessionT] $Session,
-        [Parameter(Mandatory = $true)] [string] $ContainerID
-    )
+function Get-RemoteContainerNetAdapterInformation {
+    Param ([Parameter(Mandatory = $true)] [PSSessionT] $Session,
+           [Parameter(Mandatory = $true)] [string] $ContainerID)
 
-    $JsonAdapterInfo = Invoke-Command -Session $Session -ScriptBlock {
+    $Adapter = Invoke-Command -Session $Session -ScriptBlock {
 
         $RemoteCommand = {
             $GetIPAddress = { ($_ | Get-NetIPAddress -AddressFamily IPv4).IPAddress }
             $Fields = 'ifIndex', 'ifName', 'Name', 'MacAddress', 'MtuSize', @{L='IPAddress'; E=$GetIPAddress}
             $Adapter = (Get-NetAdapter -Name 'vEthernet (Container NIC *)')[0]
-            return $Adapter | Select-Object $Fields | ConvertTo-Json -Depth 5
+            $Adapter | Select-Object $Fields | ConvertTo-Json
         }.ToString()
 
         docker exec $Using:ContainerID powershell $RemoteCommand
+    } | ConvertFrom-Json
+
+    $Ret = @{
+        ifIndex = $Adapter.ifIndex
+        ifName = $Adapter.ifName
+        AdapterFullName = $Adapter.Name
+        AdapterShortName = [regex]::new('vEthernet \((.*)\)').Replace($Adapter.Name, '$1')
+        MacAddressWindows = $Adapter.MacAddress.ToLower()
+        IPAddress = $Adapter.IPAddress
+        MtuSize = $Adapter.MtuSize
     }
 
-    return $JsonAdapterInfo | ConvertFrom-Json
-}
+    $Ret.MacAddress = $Ret.MacAddressWindows.Replace('-', ':')
 
-function Assert-IsIpAddressInRawNetAdapterInfoValid {
-    Param (
-        [Parameter(Mandatory = $true)] [PSCustomObject] $RawAdapterInfo
-    )
-
-    if (!$RawAdapterInfo.IPAddress -or ($RawAdapterInfo.IPAddress -isnot [string])) {
-        throw "Invalid IPAddress returned from container: $($RawAdapterInfo.IPAddress | ConvertTo-Json)"
-    }
-}
-
-function ConvertFrom-RawNetAdapterInformation {
-    Param (
-        [Parameter(Mandatory = $true)] [PSCustomObject] $RawAdapterInfo
-    )
-
-    $AdapterInfo = @{
-        ifIndex = $RawAdapterInfo.ifIndex
-        ifName = $RawAdapterInfo.ifName
-        AdapterFullName = $RawAdapterInfo.Name
-        AdapterShortName = [regex]::new('vEthernet \((.*)\)').Replace($RawAdapterInfo.Name, '$1')
-        MacAddressWindows = $RawAdapterInfo.MacAddress.ToLower()
-        IPAddress = $RawAdapterInfo.IPAddress
-        MtuSize = $RawAdapterInfo.MtuSize
-    }
-
-    $AdapterInfo.MacAddress = $AdapterInfo.MacAddressWindows.Replace('-', ':')
-
-    return [ContainerNetAdapterInformation] $AdapterInfo
-}
-
-function Get-RemoteContainerNetAdapterInformation {
-    Param ([Parameter(Mandatory = $true)] [PSSessionT] $Session,
-           [Parameter(Mandatory = $true)] [string] $ContainerID)
-
-    $AdapterInfo = Read-RawRemoteContainerNetAdapterInformation -Session $Session -ContainerID $ContainerID
-    Assert-IsIpAddressInRawNetAdapterInfoValid -RawAdapterInfo $AdapterInfo
-    return ConvertFrom-RawNetAdapterInformation -RawAdapterInfo $AdapterInfo
+    return [ContainerNetAdapterInformation] $Ret
 }
 
 function Get-VrfStats {

@@ -1,5 +1,3 @@
-. $PSScriptRoot\..\..\..\Common\Init.ps1
-
 Describe "SNAT manual setup" {
     It "cleans up VMA" -Pending {
         # Test-VMAShouldBeCleanedUp

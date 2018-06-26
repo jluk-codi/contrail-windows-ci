@@ -13,13 +13,7 @@ if (-not (Test-Path $TestReportDir)) {
     New-Item -ItemType Directory -Path $TestReportDir | Out-Null
 }
 
-$DetailedLogsDir = Join-Path $TestReportDir "detailed_logs"
-$DDriverJUnitLogsOutputDir = Join-Path $TestReportDir "ddriver_junit_test_logs"
-$NUnitsDir = Join-Path $TestReportDir "raw_NUnit"
-
 Invoke-IntegrationAndFunctionalTests -TestenvConfFile $TestenvConfFile `
-    -PesterLogsOutputDir $NUnitsDir `
-    -DetailedLogsOutputDir $DetailedLogsDir `
-    -AdditionalJUnitsDir $DDriverJUnitLogsOutputDir
+    -TestReportOutputDirectory $TestReportDir
 
 $Job.Done()

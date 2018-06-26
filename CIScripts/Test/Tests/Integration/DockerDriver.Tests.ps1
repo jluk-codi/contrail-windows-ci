@@ -1,8 +1,6 @@
 Param (
     [Parameter(Mandatory=$false)] [string] $TestenvConfFile,
-    [Parameter(Mandatory=$false)] [string] $LogDir = "pesterLogs",
-    [Parameter(Mandatory=$false)] [string] $AdditionalJUnitsDir = "AdditionalJUnitLogs",
-    [Parameter(ValueFromRemainingArguments=$true)] $UnusedParams
+    [Parameter(Mandatory=$false)] [string] $LogDir = "pesterLogs"
 )
 
 . $PSScriptRoot\..\..\..\Common\Aliases.ps1
@@ -12,16 +10,15 @@ Param (
 . $PSScriptRoot\..\..\PesterLogger\PesterLogger.ps1
 . $PSScriptRoot\..\..\PesterLogger\RemoteLogCollector.ps1
 
-# TODO: This path should probably come from TestenvConfFile.
-$RemoteTestModulesDir = "C:\Artifacts\"
+$TestsPath = "C:\Artifacts\"
 
 function Find-DockerDriverTests {
     Param (
         [Parameter(Mandatory=$true)] [PSSessionT] $Session,
-        [Parameter(Mandatory=$true)] [string] $RemoteSearchDir
+        [Parameter(Mandatory=$true)] [string] $RootTestModulePath
     )
     $TestModules = Invoke-Command -Session $Session {
-        Get-ChildItem -Recurse -Filter "*.test.exe" -Path $Using:RemoteSearchDir `
+        Get-ChildItem -Recurse -Filter "*.test.exe" -Path $Using:RootTestModulePath `
             | Select-Object BaseName, FullName
     }
     Write-Log "Discovered test modules: $($TestModules.BaseName)"
@@ -31,15 +28,14 @@ function Find-DockerDriverTests {
 function Invoke-DockerDriverUnitTest {
     Param (
         [Parameter(Mandatory=$true)] [PSSessionT] $Session,
-        [Parameter(Mandatory=$true)] [string] $TestModulePath,
-        [Parameter(Mandatory=$true)] [string] $RemoteJUnitOutputDir
+        [Parameter(Mandatory=$true)] [string] $TestModulePath
     )
 
     $Command = @($TestModulePath, "--ginkgo.succinct", "--ginkgo.failFast")
     $Command = $Command -join " "
 
     $Res = Invoke-NativeCommand -CaptureOutput -AllowNonZero -Session $Session {
-        Push-Location $Using:RemoteJUnitOutputDir
+        Push-Location $Using:TestsPath
         try {
             Invoke-Expression -Command $Using:Command
         } finally {
@@ -55,19 +51,12 @@ function Invoke-DockerDriverUnitTest {
 function Save-DockerDriverUnitTestReport {
     Param (
         [Parameter(Mandatory=$true)] [PSSessionT] $Session,
-        [Parameter(Mandatory=$true)] [String] $RemoteJUnitDir,
-        [Parameter(Mandatory=$true)] [string] $LocalJUnitDir
+        [Parameter(Mandatory=$true)] [string] $TestModulePath
     )
 
-    if (-not (Test-Path $LocalJUnitDir)) {
-        New-Item -ItemType Directory -Path $LocalJUnitDir | Out-Null
-    }
-
-    $FoundRemoteJUnitReports = Invoke-Command -Session $Session -ScriptBlock { 
-        Get-ChildItem -Filter "*_junit.xml" -Recurse -Path $Using:RemoteJUnitDir
-    }
-
-    Copy-Item $FoundRemoteJUnitReports.FullName -Destination $LocalJUnitDir -FromSession $Session
+    # TODO Where are these files copied to?
+    # TODO2: Fix JUnit reporters first....
+    # Copy-Item -FromSession $Session -Path ($TestsPath + $TestModulePath + "_junit.xml") -ErrorAction SilentlyContinue
 }
 
 Describe "Docker Driver" {
@@ -81,7 +70,7 @@ Describe "Docker Driver" {
             "PSUseDeclaredVarsMoreThanAssignments", "",
             Justification="Analyzer doesn't understand relation of Pester blocks"
         )]
-        $FoundTestModules = Find-DockerDriverTests -RemoteSearchDir $RemoteTestModulesDir -Session $Session
+        $FoundTestModules = Find-DockerDriverTests -RootTestModulePath "C:\Artifacts\" -Session $Session
     }
 
     AfterAll {
@@ -92,12 +81,12 @@ Describe "Docker Driver" {
     foreach ($TestModule in $FoundTestModules) {
         Context "Tests for module in $($TestModule.BaseName)" {
             It "passes tests" {
-                $TestResult = Invoke-DockerDriverUnitTest -Session $Session -TestModulePath $TestModule.FullName -RemoteJUnitOutputDir $RemoteTestModulesDir
+                $TestResult = Invoke-DockerDriverUnitTest -Session $Session -TestModulePath $TestModule.FullName
                 $TestResult | Should Be 0
             }
 
             AfterEach {
-                Save-DockerDriverUnitTestReport -Session $Session -RemoteJUnitDir $RemoteTestModulesDir -LocalJUnitDir $AdditionalJUnitsDir
+                Save-DockerDriverUnitTestReport -Session $Session -TestModulePath $TestModule.FullName
             }
         }
     }

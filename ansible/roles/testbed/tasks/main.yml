@@ -1,9 +1,5 @@
 ---
 
-- name: Include windows-common role
-  include_role:
-    name: windows-common
-
 - name: Install python 2.7.13
   win_chocolatey:
     name: python2
@@ -44,14 +40,15 @@
 - name: Install Docker-EE
   win_shell: "Install-Package Docker -ProviderName DockerProvider -Force"
 
+# we use hardcoded iis tag because of this issue: https://github.com/Microsoft/iis-docker/issues/47
 - name: Pull docker images
   win_shell: "docker pull {{ item }}"
   with_items:
     - microsoft/nanoserver
     - microsoft/windowsservercore
-    - python:3.6.5
+    - microsoft/iis:windowsservercore-10.0.14393.1358
 
-- name: Install MS Visual C++ Redist 14
+- name: Install MS Visuall C++ Redist 14
   win_chocolatey:
     name: vcredist140
     state: present

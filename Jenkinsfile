@@ -20,7 +20,6 @@ pipeline {
                 checkout scm
 
                 stash name: "CIScripts", includes: "CIScripts/**"
-                stash name: "CISelfcheck", includes: "Invoke-Selfcheck.ps1"
                 stash name: "StaticAnalysis", includes: "StaticAnalysis/**"
                 stash name: "Ansible", includes: "ansible/**"
                 stash name: "Monitoring", includes: "monitoring/**"
@@ -42,44 +41,7 @@ pipeline {
 
         stage('Build, testenv provisioning and sanity checks') {
             parallel {
-
-                stage('CI selfcheck - Windows') {
-                    agent { label 'tester' }
-                    steps {
-                        deleteDir()
-                        unstash "CIScripts"
-                        unstash "CISelfcheck"
-                        script {
-                            try {
-                                powershell script: """./Invoke-Selfcheck.ps1 `
-                                    -ReportDir ${env.WORKSPACE}/testReportsRaw/CISelfcheck/raw_NUnit"""
-                            } finally {
-                                stash name: 'CISelfcheckNUnitLogs', includes: 'testReportsRaw/CISelfcheck/raw_NUnit/**', allowEmpty: true
-                            }
-                        }
-                    }
-                }
-
-                stage('CI selfcheck - Linux') {
-                    when { expression { env.ghprbPullId } }
-                    agent { label 'linux' }
-                    options {
-                        timeout time: 5, unit: 'MINUTES'
-                    }
-                    steps {
-                        deleteDir()
-                        unstash "CIScripts"
-
-                        unstash "Monitoring"
-                        dir("monitoring") {
-                            sh "python3 -m tests.monitoring_tests"
-                        }
-
-                        runHelpersTests()
-                    }
-                }
-
-                stage('Static analysis - Windows') {
+                stage('Static analysis on Windows') {
                     agent { label 'builder' }
                     steps {
                         deleteDir()
@@ -90,7 +52,17 @@ pipeline {
                     }
                 }
 
-                stage('Static analysis - Linux') {
+                stage('Static analysis on Linux') {
+                    agent { label 'linux' }
+                    steps {
+                        deleteDir()
+                        unstash "StaticAnalysis"
+                        unstash "Ansible"
+                        sh "StaticAnalysis/ansible_linter.py"
+                    }
+                }
+
+                stage('CI test') {
                     when { expression { env.ghprbPullId } }
                     agent { label 'linux' }
                     options {
@@ -98,10 +70,11 @@ pipeline {
                     }
                     steps {
                         deleteDir()
-
-                        unstash "StaticAnalysis"
-                        unstash "Ansible"
-                        sh "StaticAnalysis/ansible_linter.py"
+                        unstash "Monitoring"
+                        dir("monitoring") {
+                            sh "python3 -m tests.monitoring_tests"
+                        }
+                        runHelpersTests()
                     }
                 }
 
@@ -142,8 +115,8 @@ pipeline {
 
                     environment {
                         TESTBED = credentials('win-testbed')
-                        TESTBED_TEMPLATE = "Template-testbed-201806061010"
-                        CONTROLLER_TEMPLATE = "Template-CentOS-7.4-Thin-LinkedClones"
+                        TESTBED_TEMPLATE = "Template-testbed-201804050628"
+                        CONTROLLER_TEMPLATE = "Template-CentOS-7.4-Thin"
                         TESTENV_MGMT_NETWORK = "VLAN_501_Management"
                         TESTENV_FOLDER = "WINCI/testenvs"
                         VCENTER_DATASTORE_CLUSTER = "WinCI-Datastores-SSD"
@@ -219,31 +192,23 @@ pipeline {
                     try {
                         powershell script: """./CIScripts/Test.ps1 `
                             -TestenvConfFile testenv-conf.yaml `
-                            -TestReportDir ${env.WORKSPACE}/testReportsRaw/WindowsCompute"""
+                            -TestReportDir ${env.WORKSPACE}/test_report/"""
                     } finally {
-                        stash name: 'windowsComputeNUnitLogs', includes: 'testReportsRaw/WindowsCompute/raw_NUnit/**', allowEmpty: true
-
-                        dir('testReportsRaw') {
-                            stash name: 'ddriverJUnitLogs', includes:
-                            'WindowsCompute/ddriver_junit_test_logs/**', allowEmpty: true
-
-                            stash name: 'detailedLogs', includes:
-                            'WindowsCompute/detailed_logs/**', allowEmpty: true
-                            }
+                        stash name: 'testReport', includes: 'test_report/*.xml', allowEmpty: true
+                        dir('test_report/detailed') {
+                            stash name: 'detailedLogs', allowEmpty: true
                         }
                     }
                 }
             }
         }
+    }
 
     environment {
         LOG_SERVER = "logs.opencontrail.org"
         LOG_SERVER_USER = "zuul-win"
         LOG_SERVER_FOLDER = "winci"
-        LOG_ROOT_DIR = "/var/www/logs"
-        MYSQL = credentials('monitoring-mysql')
-        MYSQL_HOST = "10.84.12.52"
-        MYSQL_DATABASE = "monitoring_test"
+        LOG_ROOT_DIR = "/var/www/logs/winci"
     }
 
     post {
@@ -252,69 +217,61 @@ pipeline {
                 deleteDir()
                 unstash 'CIScripts'
                 script {
-                    if (tryUnstash('windowsComputeNUnitLogs')) {
+                    try {
+                        unstash 'testReport'
+                    } catch (Exception err) {
+                        echo "No test report to parse"
+                    } finally {
                         powershell script: '''./CIScripts/GenerateTestReport.ps1 `
-                            -XmlsDir testReportsRaw/WindowsCompute/raw_NUnit `
-                            -OutputDir TestReports/WindowsCompute'''
-                    }
+                            -XmlsDir test_report `
+                            -OutputDir processed_reports'''
 
-                    if (tryUnstash('CISelfcheckNUnitLogs')) {
-                        powershell script: '''./CIScripts/GenerateTestReport.ps1 `
-                            -XmlsDir testReportsRaw/CISelfcheck/raw_NUnit `
-                            -OutputDir TestReports/CISelfcheck'''
+                        dir("processed_reports") {
+                            stash name: 'processedTestReport', allowEmpty: true
+                        }
                     }
-
-                    stash name: 'processedTestReports', includes: 'TestReports/**', allowEmpty: true
                 }
             }
 
             node('master') {
                 script {
                     deleteDir()
-                    def relLogsDstDir = logsRelPathBasedOnTriggerSource(env.JOB_NAME,
-                        env.BUILD_NUMBER, env.ZUUL_UUID)
+                    def logServer = [
+                        addr: env.LOG_SERVER,
+                        user: env.LOG_SERVER_USER,
+                        folder: env.LOG_SERVER_FOLDER,
+                        rootDir: env.LOG_ROOT_DIR
+                    ]
+                    def destDir = decideLogsDestination(logServer, env.ZUUL_UUID)
 
                     dir('to_publish') {
-                        unstash 'processedTestReports'
-                        dir('TestReports') {
-                            tryUnstash('ddriverJUnitLogs')
-                            tryUnstash('detailedLogs')
+                        unstash 'processedTestReport'
+
+                        dir('detailed_logs') {
+                            try {
+                                unstash 'detailedLogs'
+                            } catch (Exception err) {
+                            }
                         }
 
                         def logFilename = 'log.txt.gz'
-                        createCompressedLogFile(env.JOB_NAME, env.BUILD_NUMBER, logFilename)
+                        obtainLogFile(env.JOB_NAME, env.BUILD_ID, logFilename)
 
-                        def auth = sshAuthority(env.LOG_SERVER_USER, env.LOG_SERVER)
-                        def dst = logsDirInFilesystem(env.LOG_ROOT_DIR, env.LOG_SERVER_FOLDER, relLogsDstDir)
-                        publishCurrentDirToLogServer(auth, dst)
+                        publishToLogServer(logServer, ".", destDir)
                     }
 
-                    def fullLogsURL = logsURL(env.LOG_SERVER, env.LOG_SERVER_FOLDER, relLogsDstDir)
-                    def logDestMsg = "Full logs URL: ${fullLogsURL}"
-                    echo(logDestMsg)
+                    def testReportsUrl = getLogsURL(logServer, env.ZUUL_UUID)
+
                     if (isGithub()) {
-                        sendGithubComment(logDestMsg)
+                        sendGithubComment("Full logs URL: ${testReportsUrl}")
                     }
-                }
-            }
 
-            node('ansible') {
-                script {
-                    deleteDir()
-                    def relLogsDstDir = logsRelPathBasedOnTriggerSource(env.JOB_NAME, env.BUILD_NUMBER, env.ZUUL_UUID)
-                    def fullLogsURL = logsURL(env.LOG_SERVER, env.LOG_SERVER_FOLDER, relLogsDstDir)
-
-                    unstash "Monitoring"
-                    shellCommand('python3', [
-                        'monitoring/collect_and_push_build_stats.py',
-                        '--job-name', env.JOB_NAME,
-                        '--job-status', currentBuild.currentResult,
-                        '--build-url', env.BUILD_URL,
-                        '--mysql-host', env.MYSQL_HOST,
-                        '--mysql-database', env.MYSQL_DATABASE,
-                        '--mysql-username', env.MYSQL_USR,
-                        '--mysql-password', env.MYSQL_PSW,
-                    ] + getReportsLocationParam(fullLogsURL))
+                    def reportLocationsFile = "${testReportsUrl}/reports-locations.json"
+                    build job: 'WinContrail/gather-build-stats', wait: false,
+                        parameters: [string(name: 'BRANCH_NAME', value: env.BRANCH_NAME),
+                                     string(name: 'MONITORED_JOB_NAME', value: env.JOB_NAME),
+                                     string(name: 'MONITORED_BUILD_URL', value: env.BUILD_URL),
+                                     string(name: 'TEST_REPORTS_JSON_URL', value: reportLocationsFile)]
                 }
             }
         }

@@ -1,5 +1,4 @@
-. $PSScriptRoot\..\..\Common\Init.ps1
-. $PSScriptRoot/ContrailUtils.ps1
+. ./ContrailUtils.ps1
 
 function Register-DefaultResourcesInContrail {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingUserNameAndPassWordParams",

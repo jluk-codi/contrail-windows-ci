@@ -4,8 +4,7 @@
 
 Param (
     [Parameter(Mandatory=$false)] [string] $TestenvConfFile,
-    [Parameter(Mandatory=$false)] [string] $LogDir = "pesterLogs",
-    [Parameter(ValueFromRemainingArguments=$true)] $UnusedParams
+    [Parameter(Mandatory=$false)] [string] $LogDir = "pesterLogs"
 )
 
 . $PSScriptRoot\..\..\..\Common\Init.ps1
@@ -49,13 +48,13 @@ Describe "vRouter Agent MSI installer" {
     }
 
     Context "when vRouter Forwarding Extension is not running" {
-        It "registers and unregisters Agent service and never enables" {
+        It "registers/unregisters Agent service and never enables" {
             Test-AgentMSIBehaviourCorrect
         }
     }
 
     Context "when vRouter Forwarding Extension is running" {
-        It "registers and unregisters Agent service and never enables" {
+        It "registers/unregisters Agent service and never enables" {
             Test-AgentMSIBehaviourCorrect
         }
 

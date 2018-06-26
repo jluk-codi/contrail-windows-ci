@@ -1,5 +1,3 @@
-. $PSScriptRoot\..\..\..\Common\Init.ps1
-
 Describe "Windows Linux interoperation tests" {
     It "ICMP connectivity works" -Pending {
         # Test-IcmpLinuxWindowsConnectivity

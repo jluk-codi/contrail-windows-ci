@@ -1,7 +1,6 @@
 Param (
     [Parameter(Mandatory=$false)] [string] $TestenvConfFile,
-    [Parameter(Mandatory=$false)] [string] $LogDir = "pesterLogs",
-    [Parameter(ValueFromRemainingArguments=$true)] $UnusedParams
+    [Parameter(Mandatory=$false)] [string] $LogDir = "pesterLogs"
 )
 
 . $PSScriptRoot\..\..\..\Common\Aliases.ps1
@@ -18,7 +17,7 @@ Param (
 . $PSScriptRoot\..\..\PesterLogger\PesterLogger.ps1
 . $PSScriptRoot\..\..\PesterLogger\RemoteLogCollector.ps1
 
-$TCPServerDockerImage = "python-http"
+$IisTcpTestDockerImage = "iis-tcptest"
 $Container1ID = "jolly-lumberjack"
 $Container2ID = "juniper-tree"
 $NetworkName = "testnet12"
@@ -32,7 +31,7 @@ $Subnet = [SubnetConfiguration]::new(
 
 function Get-MaxIPv4DataSizeForMTU {
     Param ([Parameter(Mandatory=$true)] [Int] $MTU)
-    $MinimalIPHeaderSize = 400
+    $MinimalIPHeaderSize = 20
     return $MTU - $MinimalIPHeaderSize
 }
 
@@ -164,11 +163,8 @@ function Start-UDPEchoServerInContainer {
     '$SendPort = {0};' + `
     '$RcvPort = {1};' + `
     '$IPEndpoint = New-Object System.Net.IPEndPoint([IPAddress]::Any, $RcvPort);' + `
+    '$UDPSocket = New-Object System.Net.Sockets.UdpClient($IPEndpoint);' + `
     '$RemoteIPEndpoint = New-Object System.Net.IPEndPoint([IPAddress]::Any, 0);' + `
-    '$UDPSocket = New-Object System.Net.Sockets.UdpClient;' + `
-    '$UDPSocket.Client.SetSocketOption([System.Net.Sockets.SocketOptionLevel]::Socket, [System.Net.Sockets.SocketOptionName]::ReuseAddress, $true);' + `
-    '$UDPSocket.ExclusiveAddressUse = $false;' + `
-    '$UDPSocket.Client.Bind($IPEndpoint);' + `
     'while($true) {{' + `
     '    $Payload = $UDPSocket.Receive([ref]$RemoteIPEndpoint);' + `
     '    $RemoteIPEndpoint.Port = $SendPort;' + `
@@ -388,7 +384,7 @@ Describe "Tunnelling with Agent tests" {
 
     Context "IP fragmentation" {
         # TODO: Enable this test once fragmentation is properly implemented in vRouter
-        It "ICMP - Ping with big buffer succeeds" {
+        It "ICMP - Ping with big buffer succeeds" -Pending {
             $Container1MsgFragmentationThreshold = Get-MaxICMPDataSizeForMTU -MTU $Container1NetInfo.MtuSize
             $Container2MsgFragmentationThreshold = Get-MaxICMPDataSizeForMTU -MTU $Container2NetInfo.MtuSize
 
@@ -401,7 +397,6 @@ Describe "Tunnelling with Agent tests" {
                 $BufferSizeLargerBeforeTunnelling = $BufferSizes[$ContainerIdx] + 1
                 $BufferSizeLargerAfterTunnelling = $BufferSizes[$ContainerIdx] - 1
                 foreach ($BufferSize in @($BufferSizeLargerBeforeTunnelling, $BufferSizeLargerAfterTunnelling)) {
-                    Write-Host "********** Ping buffer size: $BufferSize"
                     Test-Ping `
                         -Session $Sessions[$ContainerIdx] `
                         -SrcContainerName $SrcContainers[$ContainerIdx] `
@@ -413,7 +408,7 @@ Describe "Tunnelling with Agent tests" {
         }
 
         # TODO: Enable this test once fragmentation is properly implemented in vRouter
-        It "UDP - sending big buffer succeeds" {
+        It "UDP - sending big buffer succeeds" -Pending {
             $MsgFragmentationThreshold = Get-MaxUDPDataSizeForMTU -MTU $Container1NetInfo.MtuSize
 
             $MessageLargerBeforeTunnelling = "a" * $($MsgFragmentationThreshold + 1)
@@ -510,7 +505,7 @@ Describe "Tunnelling with Agent tests" {
             -Session $Sessions[0] `
             -NetworkName $NetworkName `
             -Name $Container1ID `
-            -Image $TCPServerDockerImage
+            -Image $IisTcpTestDockerImage
         Write-Log "Creating container: $Container2ID"
         New-Container `
             -Session $Sessions[1] `
@@ -535,8 +530,8 @@ Describe "Tunnelling with Agent tests" {
         )]
         $Container2NetInfo = Get-RemoteContainerNetAdapterInformation `
             -Session $Sessions[1] -ContainerID $Container2ID
-        $IP = $Container2NetInfo.IPAddress
-        Write-Log "IP of ${Container2ID}: $IP"
+            $IP = $Container2NetInfo.IPAddress
+            Write-Log "IP of ${Container2ID}: $IP"
     }
 
     AfterEach {

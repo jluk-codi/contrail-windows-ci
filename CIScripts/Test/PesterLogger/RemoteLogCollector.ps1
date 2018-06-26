@@ -3,24 +3,10 @@
 
 . $PSScriptRoot/PesterLogger.ps1
 
-class CollectedLog {
-    [String] $Name
-}
-
-class ValidCollectedLog : CollectedLog {
-    [String] $Name
-    [String] $Tag
-    [Object] $Content
-}
-
-class InvalidCollectedLog : CollectedLog {
-    [Object] $Err
-}
-
 class LogSource {
     [System.Management.Automation.Runspaces.PSSession] $Session
 
-    [CollectedLog[]] GetContent() {
+    [Hashtable] GetContent() {
         throw "LogSource is an abstract class, use specific log source instead"
     }
 
@@ -32,40 +18,26 @@ class LogSource {
 class FileLogSource : LogSource {
     [String] $Path
 
-    [CollectedLog[]] GetContent() {
+    [Hashtable] GetContent() {
         $ContentGetterBody = {
             Param([Parameter(Mandatory = $true)] [string] $From)
             $Files = Get-ChildItem -Path $From -ErrorAction SilentlyContinue
-            $Logs = @()
+            $Logs = @{}
             if (-not $Files) {
-                $Logs += @{
-                    Name = $From
-                    Err = "<FILE NOT FOUND>"
-                }
+                $Logs[$From] = "<FILE NOT FOUND>"
             } else {
                 foreach ($File in $Files) {
                     $Content = Get-Content -Raw $File
-                    $Logs += @{
-                        Name = $File
-                        Tag = $File.BaseName
-                        Content = $Content
+                    $Logs[$File.FullName] = if ($Content) {
+                        $Content
+                    } else {
+                        "<FILE WAS EMPTY>"
                     }
                 }
             }
             return $Logs
         }
-
-        # We cannot create [ValidCollectedLog] and [InvalidCollectedLog] classes directly
-        # in the closure, as it may be executed in remote session, so as a workaround
-        # we need to fix the types afterwards.
-        return Invoke-CommandRemoteOrLocal -Func $ContentGetterBody -Session $this.Session -Arguments $this.Path |
-            ForEach-Object {
-                if ($_['Err']) {
-                    [InvalidCollectedLog] $_
-                } else {
-                    [ValidCollectedLog] $_
-                }
-            }
+        return Invoke-CommandRemoteOrLocal -Func $ContentGetterBody -Session $this.Session -Arguments $this.Path
     }
 
     ClearContent() {
@@ -88,25 +60,13 @@ class FileLogSource : LogSource {
 class ContainerLogSource : LogSource {
     [String] $Container
 
-    [CollectedLog[]] GetContent() {
+    [Hashtable] GetContent() {
         $Command = Invoke-NativeCommand -Session $this.Session -CaptureOutput -AllowNonZero {
             docker logs $Using:this.Container
         }
-        $Name = "$( $this.Container ) container logs"
-
-        $Log = if ($Command.ExitCode -eq 0) {
-            [ValidCollectedLog] @{
-                Name = $Name
-                Tag = $this.Container
-                Content = $Command.Output
-            }
-        } else {
-            [InvalidCollectedLog] @{
-                Name = $Name
-                Err = $Command.Output
-            }
+        return @{
+            "$( $this.Container ) container logs" = $Command.Output
         }
-        return $Log
     }
 
     ClearContent() {
@@ -165,19 +125,12 @@ function Merge-Logs {
         Write-Log ("=" * 100)
         Write-Log $ComputerNamePrefix
 
-        foreach ($Log in $LogSource.GetContent()) {
-            if ($Log -is [ValidCollectedLog]) {
-                Write-Log ("-" * 100)
-                Write-Log "Contents of $( $Log.Name ):"
-                if ($Log.Content) {
-                    Write-Log -NoTimestamp -Tag $Log.Tag $Log.Content
-                } else {
-                    Write-Log "<EMPTY>"
-                }
-            } else {
-                Write-Log "Error retrieving $( $Log.Name ):"
-                Write-Log $Log.Err
-            }
+        $Logs = $LogSource.GetContent()
+        foreach ($Log in $Logs.GetEnumerator()) {
+            $SourceFilenamePrefix = "Contents of $($Log.Key):"
+            Write-Log ("-" * 100)
+            Write-Log $SourceFilenamePrefix
+            Write-Log $Log.Value
         }
         
         if (-not $DontCleanUp) {
