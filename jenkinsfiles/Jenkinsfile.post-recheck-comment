@@ -1,0 +1,26 @@
+#!groovy
+
+pipeline {
+    agent { label "ansible" }
+
+    stages {
+        stage("Run Ansible playbook") {
+            steps {
+                dir('ansible') {
+                    ansiblePlaybook inventory: 'inventory.testenv',
+                                    playbook: 'post-recheck-comment.yml',
+                                    extraVars: [
+                                        identity_file: "${env.WORKSPACE}/gerrit_key",
+                                        change_id: env.ZUUL_CHANGE,
+                                        patchset: env.ZUUL_PATCHSET,
+                                    ]
+                }
+            }
+            post {
+                always {
+                    deleteDir()
+                }
+            }
+        }
+    }
+}
