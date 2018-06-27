@@ -102,7 +102,7 @@ function ConvertFrom-RawNetAdapterInformation {
         AdapterShortName = [regex]::new('vEthernet \((.*)\)').Replace($RawAdapterInfo.Name, '$1')
         MacAddressWindows = $RawAdapterInfo.MacAddress.ToLower()
         IPAddress = $RawAdapterInfo.IPAddress
-        MtuSize = $Adapter.MtuSize
+        MtuSize = $RawAdapterInfo.MtuSize
     }
 
     $AdapterInfo.MacAddress = $AdapterInfo.MacAddressWindows.Replace('-', ':')
