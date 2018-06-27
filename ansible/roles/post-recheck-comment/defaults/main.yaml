@@ -1,9 +1,2 @@
 max_rechecks: 3
-gerrit_server: review.opencontrail.org
-gerrit_user: codilime-ci
-gerrit_port: 29418
-gerrit_keyname: review
 ci_user: codilime-ci
-# identity_file: path that identity file will be created in
-# change_id
-# patchest
