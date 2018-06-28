@@ -15,14 +15,17 @@ drive
 ansible-worker
 jenkins-server
 
-[gerrit:children]
+[gerrit-variables:children]
 zuul
+gerrit
 
 [ansible-worker]
 
 [drive]
 
 [jenkins-server]
+
+[gerrit-variables]
 
 [gerrit]
 

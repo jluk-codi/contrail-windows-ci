@@ -1,44 +1,23 @@
 ---
 
-- hosts: localhost
+- hosts: gerrit
   gather_facts: no
   connection: local
   vars_prompt:
-    - name: gerrit_server
-      default: review.opencontrail.org
-      private: no
-    - name: gerrit_user
-      default: codilime-ci
-      private: no
-    - name: gerrit_port
-      default: 29418
-      private: no
-    - name: identity_file
+    - name: ansible_ssh_private_key_file
       prompt: Ssh identity file for gerrit (if doesn't exist, will be crated using `gerrit_keyname` key from vault)
-      private: no
-    - name: gerrit_keyname
-      default: review
       private: no
     - name: change_id
       private: no
     - name: patchset
       private: no
   tasks:
-    - name: Add {{ gerrit_server }} host to inventory
-      add_host:
-        groups: gerrit
-        host: "{{ gerrit_server }}"
-        ansible_user: "{{ gerrit_user }}"
-        ansible_port: "{{ gerrit_port }}"
-        gerrit_keyname: "{{ gerrit_keyname }}"
-        ansible_ssh_private_key_file: "{{ identity_file }}"
+    - name: Preserve some facts
+      set_fact:
+        ansible_ssh_private_key_file: "{{ ansible_ssh_private_key_file }}"
         patchset: "{{ patchset }}"
         change_id: "{{ change_id }}"
 
-- hosts: gerrit
-  gather_facts: no
-  connection: local
-  tasks:
     - name: Add gerrit servers to known hosts
       delegate_to: localhost
       known_hosts:
