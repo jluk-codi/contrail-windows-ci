@@ -43,7 +43,8 @@
   when: n_failures | int < max_rechecks | int + 1
   set_fact:
     comment_message: >
-      We've detected that Windows CI failed due to flakiness, so we're going to recheck windows
+      We've detected that Windows CI failed due to a known flakiness,
+      so we're going to recheck windows
 
 - name: Prepare the recheck limit exceeded message
   when: n_failures | int >= max_rechecks | int + 1
