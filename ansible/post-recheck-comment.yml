@@ -8,6 +8,7 @@
       prompt: Ssh identity file for gerrit (if doesn't exist, will be crated using `gerrit_keyname` key from vault)
       private: no
     - name: change_id
+      prompt: change_id (the one from URL, eg. 39226)
       private: no
     - name: patchset
       private: no
