@@ -9,12 +9,11 @@
   raw: gerrit query change:{{ change_id }} --comments --format JSON
   retries: 6
   delay: 10
+  # Note: select_reviewer_messages is a custom filter defined for this role.
   until: >
     comments.rc == 0 and
-    (comments.stdout_lines[0] | from_json).comments
-    | selectattr('reviewer.username', 'equalto', ci_user)
-    | map(attribute='message')
-    | list
+    comments
+    | select_reviewer_messages(username=ci_user)
     | last
     | regex_search(failure_pattern)
   tags:
@@ -26,9 +25,8 @@
   set_fact:
     n_failures: >
       {{
-      (comments.stdout_lines[0] | from_json).comments
-      | selectattr('reviewer.username', 'equalto', ci_user)
-      | map(attribute='message')
+      comments
+      | select_reviewer_messages(username=ci_user)
       | map('regex_search', failure_pattern)
       | select
       | list
