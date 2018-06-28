@@ -17,4 +17,5 @@ for test_input in *.in.txt
 do
     test_output=$(basename "$test_input" .in.txt).out.txt
     ../grep.sh "$test_input" | diff - "$test_output"
+    >&2 echo "$test_input" PASS
 done
