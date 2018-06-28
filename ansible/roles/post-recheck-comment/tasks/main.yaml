@@ -40,14 +40,15 @@
     var: n_failures
 
 - name: Prepare the recheck message
-  when: n_failures | int < max_rechecks | int + 1
+  register: do_recheck
+  when: n_failures | int <= max_rechecks | int
   set_fact:
     comment_message: >
       We've detected that Windows CI failed due to a known flakiness,
       so we're going to recheck windows
 
 - name: Prepare the recheck limit exceeded message
-  when: n_failures | int >= max_rechecks | int + 1
+  when: do_recheck is skipped
   set_fact:
     comment_message: >
       Automatic recheck limit ({{ max_rechecks }}) exceeded.
